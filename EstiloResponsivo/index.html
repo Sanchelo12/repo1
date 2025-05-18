@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTML Y CSS: diseño responsivo</title>
+    <style>
+        body {
+            font-family: Arial;
+            background-color: gray;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        #contenedor {
+            background-color: darkgray;
+            padding: 1rem;
+        }
+
+        #contenedor>div {
+            margin: 1rem;
+            padding: 1rem;
+        }
+
+        #contenedor #principal {
+            margin: 1rem;
+            padding: 0rem;
+        }
+
+        #datos,
+        #descripcion,
+        #contenido {
+            background-color: antiquewhite;
+        }
+
+        #principal>div {
+            margin: 0;
+            padding: 1rem;
+        }
+
+        #principal #descripcion {
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            #datos ul {
+                padding-left: 0;
+                list-style-type: none;
+            }
+
+            #datos li {
+                display: inline;
+            }
+
+            #datos li::after {
+                content: "; ";
+            }
+
+            #datos li:last-child::after {
+                content: "";
+            }
+        }
+
+        @media (min-width: 601px) and (max-width: 1200px) {
+            #contenedor {
+                display: flex;
+                gap: 1rem;
+            }
+
+            #principal {
+                width: 70%;
+            }
+
+            #apartados {
+                display: flex;
+                list-style-type: none;
+                padding: 0;
+            }
+
+            #apartados li {
+                padding: 0.5rem;
+            }
+        }
+
+        @media (min-width: 1201px) {
+            #contenedor {
+                display: flex;
+                gap: 1rem;
+            }
+
+            #contenedor #principal {
+                display: flex;
+                gap: 1rem;
+                margin: 0;
+            }
+
+            #contenedor #datos,
+            #principal #descripcion,
+            #principal #contenido {
+                margin: 0rem;
+            }
+
+            #apartados {
+                list-style-type: disc;
+            }
+
+            ul {
+                padding-left: 40px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>HTML &amp; CSS: Diseño responsivo</h1>
+
+    <div id="contenedor">
+
+        <div id="datos">
+            <h2>Datos del libro</h2>
+            <ul>
+                <li>Título: HTML Y CSS: diseño responsivo</li>
+                <li>Autor: Jose Lopez</li>
+                <li>Editorial: Publicaciones Wilde</li>
+                <li>Año de publicación: 2024</li>
+                <li>ISBN: 997-84-977079-1-8</li>
+            </ul>
+        </div>
+
+        <div id="principal">
+
+            <div id="descripcion">
+                <h2>Descripción</h2>
+                <p>El término "diseño web responsivo" fue acuñado por Ethan Marcotte en su artículo de 2010. Propone
+                    tres principios clave:</p>
+                <ul>
+                    <li>Fluid Grid Layouts</li>
+                    <li>Flexible Images</li>
+                    <li>Media Queries</li>
+                </ul>
+                <p>Tras su publicación, el diseño responsivo ganó popularidad gracias al soporte de CSS3.</p>
+                <p>Este libro es adecuado para principiantes sin conocimientos previos.</p>
+            </div>
+
+            <div id="contenido">
+                <h2>Contenido del libro</h2>
+                <p>El contenido se estructura en tres apartados:</p>
+                <ul id="apartados">
+                    <li>Viewport: área visible de la pantalla, ajustable con la etiqueta &lt;meta&gt;</li>
+                    <li>Media Queries: permiten aplicar estilos según el dispositivo</li>
+                    <li>Cuadrículas flexibles: usan porcentajes y unidades relativas (CSS Grid, Flexbox)</li>
+                </ul>
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>
