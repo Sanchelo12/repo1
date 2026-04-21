@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My First Deploy</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f4f4f4;
+        }
+
+        .btn-delete {
+            color: red;
+            cursor: pointer;
+            border: 1px solid red;
+            background: none;
+            padding: 5px;
+        }
+
+        .btn-view {
+            color: blue;
+            cursor: pointer;
+            border: 1px solid blue;
+            background: none;
+            padding: 5px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Inventory Grid</h1>
+    <a href="create.html"><button>+ Add New Item</button></a>
+    <button onclick="deleteAll()" style="background-color: #ffcccc;">Clear All</button>
+
+    <table id="itemsTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Stock</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <div id="errorMessage"
+        style="color: white; background-color: #ff4444; padding: 10px; border-radius: 5px; display: none; margin-bottom: 15px;">
+    </div>
+
+    <script>
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerText = message;
+            errorDiv.style.display = 'block';
+        }
+
+        async function loadItems() {
+            try {
+                const res = await fetch('/api/items');
+
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    console.error("Error del servidor:", errorData);
+                    alert("Error al cargar: " + (errorData.message || "Error desconocido"));
+                    return;
+                }
+
+                const items = await res.json();
+                const tbody = document.querySelector('#itemsTable tbody');
+                tbody.innerHTML = '';
+
+                if (Array.isArray(items)) {
+                    items.forEach(item => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.category}</td>
+                    <td>$${item.price}</td>
+                    <td>${item.stock}</td>
+                    <td>
+                        <button class="btn-view" onclick="viewItem(${item.id})">Details</button>
+                        <button class="btn-delete" onclick="deleteItem(${item.id})">Delete</button>
+                    </td>
+                `;
+                        tbody.appendChild(row);
+                    });
+                } else {
+                    console.error("Los datos recibidos no son un array:", items);
+                }
+            } catch (err) {
+                showError("Error loading inventory: " + err.message);
+            }
+        }
+
+        async function deleteItem(id) {
+            if (!confirm(`Are you sure you want to delete item #${id}?`)) return;
+
+            try {
+                const res = await fetch(`/api/items?id=${id}`, { method: 'DELETE' });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || 'Could not delete item');
+                }
+
+                loadItems();
+            } catch (err) {
+                showError("Delete failed: " + err.message);
+            }
+        }
+
+        async function viewItem(id) {
+            window.location.href = `details.html?id=${id}`;
+        }
+
+        async function deleteAll() {
+            if (!confirm("WARNING: This will delete EVERYTHING!")) return;
+
+            try {
+                const res = await fetch('/api/items', { method: 'DELETE' });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || 'Could not clear inventory');
+                }
+
+                loadItems();
+            } catch (err) {
+                showError("Mass delete failed: " + err.message);
+            }
+        }
+
+        window.onload = loadItems;
+    </script>
+</body>
+
+</html>

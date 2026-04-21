@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My First Deploy - Create Product</title>
+</head>
+
+<body>
+    <h1>Add New Product</h1>
+    <form id="createForm">
+        <div>
+            <label>Name:</label><br>
+            <input type="text" id="name" required>
+        </div>
+        <div>
+            <label>Category:</label><br>
+            <input type="text" id="category">
+        </div>
+        <div>
+            <label>Price:</label><br>
+            <input type="number" id="price">
+        </div>
+        <div>
+            <label>Stock:</label><br>
+            <input type="number" id="stock">
+        </div>
+        <br>
+
+        <div id="errorMessage"
+            style="color: white; background-color: #ff4444; padding: 10px; border-radius: 5px; display: none; margin-bottom: 15px;">
+        </div>
+        <br>
+        <button type="submit">Save Product</button>
+        <a href="index.html">Cancel</a>
+    </form>
+
+    <script>
+        document.getElementById('createForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.style.display = 'none';
+
+            const payload = {
+                name: document.getElementById('name').value,
+                category: document.getElementById('category').value,
+                price: parseFloat(document.getElementById('price').value) || 0,
+                stock: parseInt(document.getElementById('stock').value) || 0
+            };
+
+            try {
+                const res = await fetch('/api/items', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    window.location.href = 'index.html';
+                } else {
+                    const msg = data.error || "Unknown error";
+                    const details = data.details ? JSON.stringify(data.details) : "";
+
+                    errorDiv.innerText = `Error: ${msg} ${details}`;
+                    errorDiv.style.display = 'block';
+                }
+            } catch (err) {
+                errorDiv.innerText = "Connection error: " + err.message;
+                errorDiv.style.display = 'block';
+            }
+        };
+    </script>
+</body>
+
+</html>

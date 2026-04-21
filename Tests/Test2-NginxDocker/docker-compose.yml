@@ -1,0 +1,10 @@
+services:
+  proxy:
+    image: nginx:latest
+    ports:
+      - "443:443"
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/certs/api-uno.test+2.pem:/etc/nginx/certs/cert.pem:ro
+      - ./infra/certs/api-uno.test+2-key.pem:/etc/nginx/certs/key.pem:ro
+    ###depends_on: El depends_on sirve para definir el orden de inicio de los contenedores. Le dice a Docker: "No levantes el proxy hasta que los servicios/contenedores de backend y frontend estén corriendo".

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My First Deploy - Product Details</title>
+</head>
+
+<body>
+    <h1>Product Details</h1>
+    <div id="detailsContainer">Loading...</div>
+
+    <br>
+
+    <div id="errorMessage"
+        style="color: white; background-color: #ff4444; padding: 10px; border-radius: 5px; display: none; margin-bottom: 15px;">
+    </div>
+    <br>
+
+    <a href="index.html">Back to Inventory</a>
+
+    <script>
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerText = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('detailsContainer').innerHTML = "";
+        }
+
+        async function loadDetails() {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+
+            if (!id) {
+                showError("No ID provided in the URL.");
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/items?id=${id}`);
+                const item = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || "Item not found");
+                }
+
+                document.getElementById('detailsContainer').innerHTML = `
+                    <p><strong>ID:</strong> ${item.id}</p>
+                    <p><strong>Name:</strong> ${item.name}</p>
+                    <p><strong>Category:</strong> ${item.category || 'N/A'}</p>
+                    <p><strong>Price:</strong> $${item.price}</p>
+                    <p><strong>Stock:</strong> ${item.stock} units</p>
+                `;
+            } catch (error) {
+                console.error(error);
+                showError("Error: " + error.message);
+            }
+        }
+
+        window.onload = loadDetails;
+    </script>
+</body>
+
+</html>

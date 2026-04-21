@@ -1,0 +1,21 @@
+version: "3"
+
+tasks:
+  # Tarea principal: Levanta todo limpio
+  up:
+    desc: "Levanta Nginx y DB borrando lo anterior"
+    cmds:
+      - docker compose up --build --force-recreate --remove-orphans -d
+      - docker image prune -f # Borra imágenes "dangling" sin nombre
+
+  # Tarea para detener y limpiar
+  down:
+    desc: "Detiene y borra contenedores"
+    cmds:
+      - docker compose down --remove-orphans
+
+  # Tarea de limpieza profunda (Uso ocasional)
+  reset:
+    desc: "Borra TODO: contenedores, imágenes y volúmenes (limpia la DB)"
+    cmds:
+      - docker compose down -v --rmi all --remove-orphans
