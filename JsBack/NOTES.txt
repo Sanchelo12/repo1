@@ -1,0 +1,140 @@
+¿Cuándo usar Redis (Server-Side Cache)?
+Redis es tu mejor amigo cuando tu base de datos (PostgreSQL) empieza a sudar con consultas pesadas.
+
+Úsalo cuando:
+
+Cómputo Pesado: Tienes una consulta con 5 JOINs y GROUP BY que tarda 500ms. Guardas el JSON resultante en Redis y la siguiente vez tardas 2ms.
+
+Sesiones: Para saber si un usuario está logueado. Consultar la DB en cada clic del usuario es un desperdicio; Redis lo hace volando.
+
+Limitadores de velocidad (Rate Limiting): Para bloquear a alguien que intenta loguearse 100 veces por segundo.
+
+Contadores en vivo: "15 personas están viendo este hotel ahora".
+
+3. ¿Cuándo usar un CDN / Edge Caching?
+Un CDN (Content Delivery Network) como Cloudflare o Akamai guarda copias de tus archivos en servidores repartidos por todo el mundo (Edge).
+
+Úsalo para:
+
+Usuarios Globales: Si tu servidor está en España pero tu usuario está en Argentina, el CDN le entrega la imagen desde un servidor en Buenos Aires.
+
+Archivos Pesados: Videos, imágenes de alta resolución y librerías pesadas.
+
+Protección (WAF): Los CDNs filtran ataques antes de que lleguen a tu servidor de Express.
+
+
+-----
+
+¿Cómo decidir? Hazte estas 3 preguntas:
+¿El dato es igual para todos? → Usa CDN.
+
+¿El dato es específico del usuario pero se usa mucho? → Usa Redis.
+
+¿El dato es estático y no requiere seguridad extrema? → Usa Navegador.
+
+Un error común: Intentar cachear en el navegador datos que cambian por detrás. Por ejemplo, si cacheas el "Precio" en el navegador por 1 hora y el dueño de la tienda lo baja un 50%, el usuario no verá el descuento y podrías perder la venta. En esos casos, es mejor Redis (porque puedes borrarlo tú manualmente) o no usar cache.
+
+---
+
+Service Workers (El siguiente nivel)
+Son scripts que corren en el navegador y actúan como un "proxy". Pueden interceptar peticiones de red y decidir: "¿Saco esto de la caché del dispositivo o voy a internet?". Es la base de las PWA (Progressive Web Apps) para que funcionen sin conexión.
+
+
+----
+
+¿Es duplicar datos? (El costo de la memoria)
+Sí, técnicamente estás duplicando el dato, pero solo de forma temporal.
+
+No guardas toda tu base de datos en Redis. Solo guardas los "VIP": los datos que se piden miles de veces por segundo.
+
+.....Ejemplo de los Contadores en vivo: Si tienes 10,000 personas viendo un producto y quieres mostrar "X personas ven esto", hacer un UPDATE en PostgreSQL 10,000 veces por segundo destrozaría el rendimiento de tu disco. Redis maneja eso sin despeinarse porque solo cambia un bit en la RAM.----
+
+-----
+
+El Administrador debe actuar sobre la Base de Datos como fuente de verdad y sobre Redis como mecanismo de control inmediato. Lo ideal es que, cuando un Admin modifica o elimina a un usuario, tu código intente borrar la clave de ese usuario en Redis (redis.del); si el usuario no ha iniciado sesión y no está en Redis, el comando simplemente no hace nada y no pasa nada malo. Cuando ese usuario intente loguearse en el futuro, el sistema irá a PostgreSQL, verá los datos nuevos (o que ya no existe) y recién ahí subirá la información actualizada a Redis. De esta forma, aseguras que cualquier cambio "en vivo" expulse al usuario de su sesión actual al instante, mientras que para los usuarios desconectados, el cambio queda guardado en la base de datos esperando su próximo intento de entrada.
+
+Aunque parezca contradictorio, la práctica estándar y más segura en programación es borrar (DEL) en lugar de actualizar (UPDATE) el valor en Redis, incluso si el Admin solo está modificando un dato.
+
+¿Por qué borrar (DEL) es mejor que actualizar en Redis? Si por un microsegundo otra petición lee de Redis mientras estás actualizando, o si hay un error de red, podrías terminar con datos inconsistentes (el "Race Condition"). Además, obligas al Admin a saber exactamente cómo es la estructura de la sesión en Redis.
+
+Opción B (Borrar en Redis - La recomendada): El Admin cambia en PostgreSQL y simplemente borra la llave user:session:123. Es una operación "atómica" y segura. La próxima vez que el usuario haga una petición, el sistema verá que no hay nada en Redis, irá a la base de datos (que ya tiene el dato nuevo y real), y lo volverá a subir a Redis.
+
+¿Qué pasa si el usuario no está en Redis?
+Como bien dices, si el usuario no ha iniciado sesión, no hay nada en Redis.
+Si ejecutas redis.del("user:123") y la llave no existe: No pasa nada. Redis responde "0 filas afectadas" y tu código sigue adelante sin errores. Es una operación muy barata y segura.
+
+¿Cuándo se vuelve a poner en Redis?
+Se pone en Redis en dos momentos:
+- Al hacer Login: Cuando el usuario pone su contraseña y todo es correcto.
+- En el Middleware (Lazy Loading): Si el usuario ya tiene un JWT válido pero su sesión en Redis fue borrada por el Admin, el middleware dirá: "Oh, el token es válido pero no estoy en Redis. Iré un momento a PostgreSQL a verificar...". 
+Tú tienes tu JWT (Cookie) que dice que eres "Admin". El Admin de verdad te quita el rango en PostgreSQL y hace DEL user:123 en Redis. Cuando tú haces clic en "Panel de Control", el middleware hace esto:
+- Verifica el JWT: "La firma es correcta, el token no ha expirado. Eres el usuario 123".
+- Busca en Redis: "Ups, no hay nada para user:123. El caché está vacío".
+- Va a PostgreSQL (Lazy Loading): "Voy a ver quién es el usuario 123 en la base de datos real".
+
+¿Se recarga o se expulsa?
+Aquí es donde el middleware toma la decisión basada en lo que encontró en PostgreSQL:
+- ESCENARIO A: Solo fue un cambio de Rol (Sigue siendo válido): PostgreSQL dice: "El usuario 123 ahora es vendedor (antes era admin)". El middleware guarda el nuevo rol en Redis y te deja pasar... pero si intentabas entrar al panel de Admin, el siguiente middleware (checkRole) verá que ahora eres vendedor y te dirá: "Acceso Denegado".
+- ESCENARIO B: Fuiste Desactivado o Eliminado: PostgreSQL dice: "El usuario 123 está is_active = false" o "Ese ID ya no existe". El middleware NO guarda nada en Redis. Al contrario, ejecuta la lógica de Logout. Borra la Cookie del navegador. Responde con un error 401 Unauthorized. Tu Frontend (Zustand) detecta el 401 y te manda a la pantalla de Login.
+
+---Dato Clave: No hace falta "desactivar el token" físicamente (porque los JWT no se pueden borrar una vez emitidos). Lo que haces es invalidar la sesión en el servidor. El token sigue existiendo en el navegador del usuario, pero ya no le sirve para abrir ninguna puerta porque el middleware siempre preguntará a la DB/Redis antes de dejarlo pasar.
+
+
+
+¿Dónde poner la lógica de Redis?
+No te recomiendo ponerla dentro de checkRole. ¿Por qué? Porque checkRole solo se usa en rutas protegidas. Lo ideal es que la validación de Redis ocurra en el verifyToken.
+
+verifyToken se ejecuta en todas las rutas privadas. Si el Admin banea a un usuario, quieres que el usuario sea expulsado de cualquier parte de la app, no solo de las funciones de Admin.
+
+Si lo pones en verifyToken, cuando llegas a checkRole, ya tienes la seguridad de que el usuario está activo y su rol es el correcto en req.user.
+
+--Solo guarda en Redis lo que tus middlewares y controladores necesitan para trabajar en cada petición. No satures Redis con datos que no usas (como el password_hash o la fecha de creación), pero asegúrate de que lo que guardes sea un "superconjunto" de lo que tiene el token. Nunca cargues todo el registro (como archivos adjuntos o textos largos) en Redis. Redis es para metadatos de sesión. Campos Irrelevantes (NO): password_hash, created_at, biografía, foto_de_perfil_en_base64.
+
+Tu Token solo tiene id, username y role. Pero en una aplicación real, muchas veces necesitas saber si el usuario está activo o sus preferencias.
+const sessionData = {
+  id: user.id,
+  username: user.username,
+  role: user.role_name, // Lo que el token ya tiene
+  is_active: user.is_active, // <--- CRÍTICO para seguridad
+  preferences: user.preferences // <--- ÚTIL para no ir a la DB en cada carga
+};
+
+¿Por qué esto es mejor que confiar solo en el decoded del Token?
+- Si usas solo el decoded del JWT: Tienes los datos que el usuario tenía hace 5 minutos (cuando se creó el token). Si el admin le quitó el rol de "admin" hace 1 minuto, el decoded mentirá y dirá que sigue siendo admin.
+- Si usas Redis: Aunque el decoded diga que es "admin", cuando haces redis.get, obtendrás el objeto actualizado. Al sobreescribir req.user = JSON.parse(userData), estás "corrigiendo" la información vieja del token con la información fresca de la memoria RAM.
+
+Cuando el usuario cambia su tema de "claro" a "oscuro", la API hace lo siguiente:
+- Guarda en PostgreSQL: Esto es obligatorio. Es la única forma de que, si el servidor se apaga o el usuario entra desde otro navegador mañana, el cambio siga ahí.
+- Actualiza o Borra en Redis: Esto es opcional pero recomendado. Lo haces para que la próxima vez que el usuario haga clic en otra página, el middleware verifyToken lea el nuevo tema desde la RAM (Redis) y no tenga que molestar a PostgreSQL.
+
+¿Por qué no es "pesado"?
+Parece doble trabajo, pero en realidad estás ahorrando miles de operaciones a futuro:
+- Escritura (Lenta pero necesaria): El usuario cambia su preferencia una vez cada tanto (un clic). Hacer un UPDATE en Postgres y un SET en Redis toma milisegundos y ocurre muy pocas veces.
+- Lectura (Rápida y constante): El usuario navega por 50 páginas después de loguearse. Si no usaras Redis, harías 50 consultas a PostgreSQL solo para saber qué tema mostrar. Con Redis, haces 50 lecturas a la RAM, que son prácticamente gratis en términos de recursos.
+
+El Token debe ser "ligero" (lo más pequeño posible) y Redis puede ser "pesado" (todo lo que tus middlewares y controladores necesiten consultar seguido).
+
+----TO-DO
+Agregar redis al contorller: src/controllers/user.controller.js: Aquí disparas el redis.del() cuando un Admin haga un update.
+
+Si tienes Docker Desktop instalado, no necesitas instalar nada en Windows directamente. Solo corres un contenedor:
+- Abre una terminal (PowerShell o CMD).
+- Ejecuta: docker run -d --name mi-redis -p 6379:6379 redis
+- Esto mapea el puerto 6379 de Docker al de tu Windows, así que tu código de Node.js lo verá como si estuviera en localhost:6379.
+
+-...Con Docker no importa si tu computadora es Windows, Mac o Linux; el contenedor de Redis funcionará exactamente igual en todas.
+
+...¿Qué deberías meter en Docker?
+Aquí tienes dos estrategias, pero te recomiendo empezar por la A:
+- Estrategia A (Solo los servicios): Dejas tu código de Node.js/Express corriendo en tu Windows (en tu VS Code normal) y usas Docker solo para Redis y PostgreSQL.
+	- Ventaja: No tienes que instalar nada "raro" en Windows. Solo prendes el contenedor de Redis y tu Node.js se conecta a localhost:6379 como si fuera un programa normal. Es lo más cómodo para desarrollar.
+- Estrategia B (Todo el entorno): Metes el Backend, Redis y la DB en Docker usando algo llamado docker-compose.
+	- Ventaja: Es lo que se usa en producción. Si otra persona quiere trabajar en tu proyecto, solo escribe un comando y toda la App (con BD y todo) se levanta sola.
+
+...¿Vale la pena en Linux también?
+Sí. Incluso en Linux, instalar Redis directamente ("bare metal") puede ensuciar tu sistema con configuraciones y archivos que luego son difíciles de borrar. Con Docker, si ya no quieres Redis, borras el contenedor y tu sistema queda impecable. Además, puedes tener varias versiones de Redis (la 6.0 y la 7.0) corriendo al mismo tiempo sin que choquen.
+
+¿Por qué es necesario instalar Redis?
+Tu código de Node.js (usando la librería ioredis) es solo un cliente. Es como un navegador web: el navegador no es "el internet", necesita conectarse a un servidor.
+- Node.js (Cliente): Envía la orden "Guarda el usuario 123".
+- Redis (Servidor): Recibe la orden y guarda el dato en la memoria RAM de tu Windows.

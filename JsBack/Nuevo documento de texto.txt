@@ -1,0 +1,5 @@
+Zustand: Es el "rey" actual por su sencillez. No usa Providers (no envuelves tu app en un componente), tiene casi cero boilerplate (código repetitivo) y es extremadamente rápido.
+
+Redux (Toolkit): Se sigue usando mucho en empresas grandes o proyectos con estados masivamente complejos que requieren herramientas de depuración muy estrictas (Time Travel Debugging).
+
+Context API: Solo se recomienda para cosas que casi no cambian, como el Idioma o el Tema (oscuro/claro).
