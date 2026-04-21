@@ -1,0 +1,3 @@
+packages:
+  - "sales01-api"
+  - "sales01-client"

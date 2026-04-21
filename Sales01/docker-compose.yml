@@ -1,0 +1,52 @@
+services:
+  proxy:
+    image: nginx:latest
+    ports:
+      # Puerto Host (Windows) : Puerto Contenedor (Linux)
+      - "443:443"
+    volumes:
+      # Ruta en Windows : Ruta en la "caja" Linux
+      - ./infra/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/certs/sales01.test+2.pem:/etc/nginx/certs/cert.pem:ro
+      - ./infra/certs/sales01.test+2-key.pem:/etc/nginx/certs/key.pem:ro
+    depends_on:
+      - backend
+      - frontend
+
+  backend:
+    build: ./sales01-api
+    # No necesita ports: porque Nginx lo busca internamente en el 3000
+    depends_on:
+      - db
+    volumes:
+      - ./sales01-api:/app # Mapea tu carpeta local a /app en Docker
+      - /app/node_modules # No sobreescribas los node_modules de Linux con los de Windows
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://myuser:mypassword@db:5432/salesdb
+      PORT: 3000
+
+  frontend:
+    build: ./sales01-client
+    volumes:
+      - ./sales01-client:/app # Puente para el código del front
+      - /app/node_modules # Protege las librerías instaladas
+    environment:
+      VITE_DEV_MODE: true
+      VITE_API_URL: https://api.sales01.test
+      VITE_TEST_ADMIN_USER: admin@test.com
+      VITE_TEST_ADMIN_PASS: admin123
+      VITE_TEST_CUSTOMER_USER: cliente@test.com
+      VITE_TEST_CUSTOMER_PASS: cliente123
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: salesdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # <--- Úsalo aquí
+
+volumes:
+  postgres_data: # <--- Créalo aquí

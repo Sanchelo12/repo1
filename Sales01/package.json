@@ -1,0 +1,13 @@
+{
+  "name": "sales01-monorepo",
+  "private": true,
+  "type": "module",
+  "description": "Proyect Sales01 - Fullstack Monorepo",
+  "scripts": {
+    "api": "pnpm --filter sales01-api start",
+    "client": "pnpm --filter sales01-client dev",
+    "dev": "pnpm --parallel dev",
+    "db:seed": "pnpm --filter sales01-api seed",
+    "db:generate": "pnpm --filter sales01-api prisma generate"
+  }
+}

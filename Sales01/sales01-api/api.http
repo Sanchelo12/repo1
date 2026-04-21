@@ -1,0 +1,112 @@
+### Configuración de Variables
+@hostname = localhost
+@port = 3000
+@baseUrl = https://api.sales01.test/api
+
+###---Products---
+
+### GetAll
+GET {{baseUrl}}/products
+Content-Type: application/json
+
+### GetById
+GET {{baseUrl}}/products/{{prod_keyboard}}
+Content-Type: application/json
+
+### Create
+POST {{baseUrl}}/products
+Content-Type: application/json
+x-user-id: {{adminId}}
+x-user-role: admin
+
+{
+  "name": "Teclado Mecánico",
+  "price": 50,
+  "current_stock": "25",
+  "min_stock": 5
+}
+
+### Update
+PUT {{baseUrl}}/products/{{prod_mouse}}
+Content-Type: application/json
+x-user-id: {{adminId}}
+x-user-role: admin
+
+{
+"price": 12.99,
+"current_stock": 50
+}
+
+###Delete
+DELETE {{baseUrl}}/products/{{prod_lamp}}
+Content-Type: application/json
+x-user-id: {{adminId}}
+x-user-role: admin
+
+###---Sales---
+
+### REALIZAR UNA VENTA EXITOSA (Simulando Cliente)
+# Escenario: Compra normal que descuenta stock
+POST {{baseUrl}}/sales
+Content-Type: application/json
+x-user-id: {{customerId}}
+x-user-role: customer
+
+{
+  "items": [
+    {
+      "productId": "{{prod_keyboard}}",
+      "quantity": 4
+    },
+    {
+      "productId": "{{prod_mouse}}",
+      "quantity": 8
+    }
+  ]
+}
+
+### PROBAR ALERTA DE STOCK BAJO
+# Escenario: Comprar lo suficiente para quedar por debajo del stock mínimo (5)
+# Si en el seed tenías 25, compra 21 para que queden 4.
+POST {{baseUrl}}/sales
+Content-Type: application/json
+x-user-id: {{customerId}}
+x-user-role: customer
+
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 21
+    }
+  ]
+}
+
+### PROBAR ERROR: STOCK INSUFICIENTE
+# Escenario: Intentar comprar más de lo que existe. 
+# La transacción debería fallar y no crear la venta.
+POST {{baseUrl}}/sales
+Content-Type: application/json
+x-user-id: {{customerId}}
+x-user-role: customer
+
+{
+  "items": [
+    {
+      "productId": 3,
+      "quantity": 999
+    }
+  ]
+}
+
+### PROBAR RBAC (CONTROL DE ACCESO)
+# Escenario: Intentar acceder a una ruta de admin siendo 'customer'
+# (Asumiendo que creas una ruta para ver todas las ventas)
+GET {{baseUrl}}/sales
+x-user-id: {{customerId}}
+x-user-role: customer
+
+###
+GET {{baseUrl}}/sales
+x-user-id: {{{{adminId}}}}
+x-user-role: admin
